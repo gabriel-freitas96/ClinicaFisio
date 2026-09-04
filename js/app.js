@@ -1,6 +1,7 @@
 const state = {
     role: 'admin',
     page: 'dashboard',
+    currentPatientId: null,
     appointments: [],
     patients: [],
     assessments: [],
@@ -81,6 +82,14 @@ const defaultAssessments = [
     }
 ];
 
+const defaultAccounts = [
+    {
+        email: 'paciente@joelmafisioterapia.com',
+        password: '123456',
+        patientId: 1
+    }
+];
+
 const defaultPayments = [
     {
         id: 1,
@@ -113,20 +122,31 @@ const defaultPayments = [
 
 function loadData() {
     state.patients =
-        JSON.parse(localStorage.getItem('jf_patients') || 'null') ||
-        defaultPatients;
+        JSON.parse(
+            localStorage.getItem('jf_patients') || 'null'
+        ) || defaultPatients;
 
     state.appointments =
-        JSON.parse(localStorage.getItem('jf_appointments') || 'null') ||
-        defaultAppointments;
+        JSON.parse(
+            localStorage.getItem('jf_appointments') || 'null'
+        ) || defaultAppointments;
 
     state.assessments =
-        JSON.parse(localStorage.getItem('jf_assessments') || 'null') ||
-        defaultAssessments;
+        JSON.parse(
+            localStorage.getItem('jf_assessments') || 'null'
+        ) || defaultAssessments;
 
     state.payments =
-        JSON.parse(localStorage.getItem('jf_payments') || 'null') ||
-        defaultPayments;
+        JSON.parse(
+            localStorage.getItem('jf_payments') || 'null'
+        ) || defaultPayments;
+
+    if (!localStorage.getItem('jf_accounts')) {
+        localStorage.setItem(
+            'jf_accounts',
+            JSON.stringify(defaultAccounts)
+        );
+    }
 }
 
 function saveData() {
@@ -152,22 +172,91 @@ function saveData() {
 }
 
 function login() {
-    const roleElement = document.getElementById('loginRole');
+    const email =
+        document
+            .getElementById('loginEmail')
+            ?.value
+            .trim()
+            .toLowerCase();
 
-    if (!roleElement) {
-        console.error('Elemento #loginRole não encontrado.');
+    const password =
+        document.getElementById('loginPassword')?.value;
+
+    const role =
+        document.getElementById('loginRole')?.value;
+
+    if (!email || !password) {
+        toast(
+            'Informe seu e-mail e sua senha.',
+            'danger'
+        );
         return;
     }
 
-    state.role = roleElement.value;
+    if (role === 'admin') {
 
-    const loginScreen = document.getElementById('loginScreen');
-    const app = document.getElementById('app');
-    const adminMenu = document.getElementById('adminMenu');
-    const userMenu = document.getElementById('userMenu');
+        if (
+            email !== 'admin@joelmafisioterapia.com' ||
+            password !== '123456'
+        ) {
+            toast(
+                'E-mail ou senha da administradora inválidos.',
+                'danger'
+            );
+            return;
+        }
+
+        state.currentPatientId = null;
+
+    } else {
+
+        const accounts =
+            JSON.parse(
+                localStorage.getItem('jf_accounts') || '[]'
+            );
+
+        const account =
+            accounts.find(
+                item =>
+                    item.email === email &&
+                    item.password === password
+            );
+
+        if (!account) {
+            toast(
+                'E-mail ou senha inválidos. Crie uma conta para continuar.',
+                'danger'
+            );
+            return;
+        }
+
+        state.currentPatientId =
+            account.patientId;
+    }
+
+    state.role = role;
+
+    const loginScreen =
+        document.getElementById(
+            'loginScreen'
+        );
+
+    const app =
+        document.getElementById(
+            'app'
+        );
+
+    const adminMenu =
+        document.getElementById(
+            'adminMenu'
+        );
+
+    const userMenu =
+        document.getElementById(
+            'userMenu'
+        );
 
     if (!loginScreen || !app) {
-        console.error('Elementos #loginScreen ou #app não encontrados.');
         return;
     }
 
@@ -188,15 +277,36 @@ function login() {
         );
     }
 
-    const profileName = document.getElementById('profileName');
-    const profileRole = document.getElementById('profileRole');
-    const profileAvatar = document.getElementById('profileAvatar');
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                state.currentPatientId
+        );
+
+    const profileName =
+        document.getElementById(
+            'profileName'
+        );
+
+    const profileRole =
+        document.getElementById(
+            'profileRole'
+        );
+
+    const profileAvatar =
+        document.getElementById(
+            'profileAvatar'
+        );
 
     if (profileName) {
         profileName.textContent =
             state.role === 'admin'
                 ? 'Joelma Negreiros'
-                : 'Gabriel Lacerda';
+                : (
+                    patient?.name ||
+                    'Paciente'
+                );
     }
 
     if (profileRole) {
@@ -207,10 +317,25 @@ function login() {
     }
 
     if (profileAvatar) {
-        profileAvatar.textContent =
+
+        const name =
             state.role === 'admin'
-                ? 'JN'
-                : 'GL';
+                ? 'Joelma Negreiros'
+                : (
+                    patient?.name ||
+                    'Paciente'
+                );
+
+        profileAvatar.textContent =
+            name
+                .split(' ')
+                .map(
+                    item =>
+                        item[0]
+                )
+                .slice(0, 2)
+                .join('')
+                .toUpperCase();
     }
 
     state.page =
@@ -222,42 +347,216 @@ function login() {
     renderPage();
 }
 
-function logout() {
-    const app = document.getElementById('app');
-    const loginScreen = document.getElementById('loginScreen');
+function openRegisterModal() {
+    const modal =
+        document.getElementById(
+            'registerModal'
+        );
 
-    if (app) {
-        app.classList.add('d-none');
-    }
-
-    if (loginScreen) {
-        loginScreen.classList.remove('d-none');
+    if (modal) {
+        new bootstrap.Modal(
+            modal
+        ).show();
     }
 }
 
+function registerPatient() {
+    const form =
+        document.getElementById(
+            'registerForm'
+        );
+
+    if (
+        !form ||
+        !form.checkValidity()
+    ) {
+        form?.reportValidity();
+        return;
+    }
+
+    const name =
+        document
+            .getElementById(
+                'registerName'
+            )
+            .value
+            .trim();
+
+    const phone =
+        document
+            .getElementById(
+                'registerPhone'
+            )
+            .value
+            .trim();
+
+    const goal =
+        document
+            .getElementById(
+                'registerGoal'
+            )
+            .value
+            .trim() ||
+        'Acompanhamento fisioterapêutico';
+
+    const email =
+        document
+            .getElementById(
+                'registerEmail'
+            )
+            .value
+            .trim()
+            .toLowerCase();
+
+    const password =
+        document.getElementById(
+            'registerPassword'
+        ).value;
+
+    const accounts =
+        JSON.parse(
+            localStorage.getItem(
+                'jf_accounts'
+            ) || '[]'
+        );
+
+    if (
+        email ===
+            'admin@joelmafisioterapia.com' ||
+        accounts.some(
+            item =>
+                item.email ===
+                email
+        )
+    ) {
+        toast(
+            'Este e-mail já está cadastrado.',
+            'danger'
+        );
+        return;
+    }
+
+    const patientId =
+        Date.now();
+
+    state.patients.push({
+        id: patientId,
+        name,
+        phone,
+        goal
+    });
+
+    accounts.push({
+        email,
+        password,
+        patientId
+    });
+
+    localStorage.setItem(
+        'jf_accounts',
+        JSON.stringify(accounts)
+    );
+
+    saveData();
+
+    const modalElement =
+        document.getElementById(
+            'registerModal'
+        );
+
+    const modal =
+        bootstrap.Modal.getInstance(
+            modalElement
+        );
+
+    if (modal) {
+        modal.hide();
+    }
+
+    form.reset();
+
+    document.getElementById(
+        'loginEmail'
+    ).value = email;
+
+    document.getElementById(
+        'loginPassword'
+    ).value = password;
+
+    document.getElementById(
+        'loginRole'
+    ).value = 'user';
+
+    toast(
+        'Conta criada. Agora entre no sistema.',
+        'success'
+    );
+}
+
+function logout() {
+    const app =
+        document.getElementById(
+            'app'
+        );
+
+    const loginScreen =
+        document.getElementById(
+            'loginScreen'
+        );
+
+    if (app) {
+        app.classList.add(
+            'd-none'
+        );
+    }
+
+    if (loginScreen) {
+        loginScreen.classList.remove(
+            'd-none'
+        );
+    }
+
+    state.role = 'admin';
+    state.currentPatientId = null;
+}
+
 function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar =
+        document.getElementById(
+            'sidebar'
+        );
 
     if (sidebar) {
-        sidebar.classList.toggle('open');
+        sidebar.classList.toggle(
+            'open'
+        );
     }
 }
 
 function toggleTheme() {
-    document.body.classList.toggle('dark-mode');
+    document.body.classList.toggle(
+        'dark-mode'
+    );
 
     localStorage.setItem(
         'jf_dark',
-        document.body.classList.contains('dark-mode')
+        document.body.classList.contains(
+            'dark-mode'
+        )
     );
 }
 
 function patientName(id) {
-    const patient = state.patients.find(
-        patient => patient.id == id
-    );
+    const patient =
+        state.patients.find(
+            patient =>
+                patient.id == id
+        );
 
-    return patient?.name || 'Paciente';
+    return (
+        patient?.name ||
+        'Paciente'
+    );
 }
 
 function formatDate(date) {
@@ -267,11 +566,15 @@ function formatDate(date) {
 
     return new Date(
         date + 'T00:00:00'
-    ).toLocaleDateString('pt-BR');
+    ).toLocaleDateString(
+        'pt-BR'
+    );
 }
 
 function money(value) {
-    return Number(value).toLocaleString(
+    return Number(
+        value
+    ).toLocaleString(
         'pt-BR',
         {
             style: 'currency',
@@ -287,17 +590,23 @@ function today() {
 }
 
 function statusBadge(status) {
-    let className = 'badge-pending';
+
+    let className =
+        'badge-pending';
 
     if (
         status === 'Confirmada' ||
         status === 'Pago'
     ) {
-        className = 'badge-confirmed';
+        className =
+            'badge-confirmed';
     }
 
-    if (status === 'Cancelada') {
-        className = 'badge-cancelled';
+    if (
+        status === 'Cancelada'
+    ) {
+        className =
+            'badge-cancelled';
     }
 
     return `
@@ -313,51 +622,88 @@ function activateMenu() {
             '.menu-link[data-page]'
         );
 
-    menuLinks.forEach(button => {
-        button.classList.toggle(
-            'active',
-            button.dataset.page === state.page
-        );
+    menuLinks.forEach(
+        button => {
 
-        button.onclick = () => {
-            state.page = button.dataset.page;
+            button.classList.toggle(
+                'active',
+                button.dataset.page ===
+                    state.page
+            );
 
-            activateMenu();
-            renderPage();
+            button.onclick = () => {
 
-            if (window.innerWidth < 992) {
-                toggleSidebar();
-            }
-        };
-    });
+                state.page =
+                    button.dataset.page;
+
+                activateMenu();
+                renderPage();
+
+                if (
+                    window.innerWidth <
+                    992
+                ) {
+                    toggleSidebar();
+                }
+            };
+        }
+    );
 }
 
 function renderPage() {
+
     const titles = {
-        dashboard: 'Dashboard',
-        agenda: 'Agenda e consultas',
-        pacientes: 'Pacientes',
-        avaliacoes: 'Avaliações físicas',
-        pagamentos: 'Pagamentos',
-        relatorios: 'Relatórios',
-        'meu-dashboard': 'Minha área',
-        'minhas-consultas': 'Minhas consultas',
-        'minhas-avaliacoes': 'Minhas avaliações',
-        'meus-pagamentos': 'Meus pagamentos'
+
+        dashboard:
+            'Início',
+
+        agenda:
+            'Agenda e consultas',
+
+        pacientes:
+            'Pacientes',
+
+        avaliacoes:
+            'Avaliações físicas',
+
+        pagamentos:
+            'Pagamentos',
+
+        relatorios:
+            'Relatórios',
+
+        'meu-dashboard':
+            'Minha área',
+
+        'minhas-consultas':
+            'Minhas consultas',
+
+        'minhas-avaliacoes':
+            'Minhas avaliações',
+
+        'meus-pagamentos':
+            'Meus pagamentos'
     };
 
     const pageTitle =
-        document.getElementById('pageTitle');
+        document.getElementById(
+            'pageTitle'
+        );
 
     const breadcrumb =
-        document.getElementById('breadcrumb');
+        document.getElementById(
+            'breadcrumb'
+        );
 
     const todayDate =
-        document.getElementById('todayDate');
+        document.getElementById(
+            'todayDate'
+        );
 
     if (pageTitle) {
         pageTitle.textContent =
-            titles[state.page] || 'Página';
+            titles[state.page] ||
+            'Página';
     }
 
     if (breadcrumb) {
@@ -380,34 +726,55 @@ function renderPage() {
     }
 
     const views = {
-        dashboard: adminDashboard,
-        agenda: agenda,
-        pacientes: patients,
-        avaliacoes: assessments,
-        pagamentos: payments,
-        relatorios: reports,
-        'meu-dashboard': userDashboard,
-        'minhas-consultas': userAppointments,
-        'minhas-avaliacoes': userAssessments,
-        'meus-pagamentos': userPayments
+
+        dashboard:
+            adminDashboard,
+
+        agenda:
+            agenda,
+
+        pacientes:
+            patients,
+
+        avaliacoes:
+            assessments,
+
+        pagamentos:
+            payments,
+
+        relatorios:
+            reports,
+
+        'meu-dashboard':
+            userDashboard,
+
+        'minhas-consultas':
+            userAppointments,
+
+        'minhas-avaliacoes':
+            userAssessments,
+
+        'meus-pagamentos':
+            userPayments
     };
 
     const pageContent =
-        document.getElementById('pageContent');
+        document.getElementById(
+            'pageContent'
+        );
 
     if (!pageContent) {
-        console.error(
-            'Elemento #pageContent não encontrado.'
-        );
         return;
     }
 
     if (!views[state.page]) {
+
         pageContent.innerHTML = `
             <div class="alert alert-danger">
                 Página não encontrada.
             </div>
         `;
+
         return;
     }
 
@@ -416,23 +783,33 @@ function renderPage() {
 }
 
 function adminDashboard() {
-    const currentDate = today();
+
+    const currentDate =
+        today();
 
     const appointmentsToday =
         state.appointments.filter(
             appointment =>
-                appointment.date === currentDate
+                appointment.date ===
+                currentDate
         );
 
     const received =
         state.payments
             .filter(
                 payment =>
-                    payment.status === 'Pago'
+                    payment.status ===
+                    'Pago'
             )
             .reduce(
-                (sum, payment) =>
-                    sum + Number(payment.value),
+                (
+                    sum,
+                    payment
+                ) =>
+                    sum +
+                    Number(
+                        payment.value
+                    ),
                 0
             );
 
@@ -440,11 +817,18 @@ function adminDashboard() {
         state.payments
             .filter(
                 payment =>
-                    payment.status === 'Pendente'
+                    payment.status ===
+                    'Pendente'
             )
             .reduce(
-                (sum, payment) =>
-                    sum + Number(payment.value),
+                (
+                    sum,
+                    payment
+                ) =>
+                    sum +
+                    Number(
+                        payment.value
+                    ),
                 0
             );
 
@@ -452,16 +836,24 @@ function adminDashboard() {
         state.appointments
             .filter(
                 appointment =>
-                    appointment.date >= currentDate
+                    appointment.date >=
+                    currentDate
             )
             .sort(
-                (a, b) =>
-                    (a.date + a.time)
-                        .localeCompare(
-                            b.date + b.time
-                        )
+                (
+                    a,
+                    b
+                ) =>
+                    (
+                        a.date +
+                        a.time
+                    ).localeCompare(
+                        b.date +
+                        b.time
+                    )
             )
             .slice(0, 5);
+
 
     return `
         <div class="hero">
@@ -471,31 +863,32 @@ function adminDashboard() {
                 <div class="col-lg-8">
 
                     <h1>
-                        Bom dia,venha conhecer a clinica de fisioterapia e agende sua consulta.
+                        Bom dia, Joelma, sua clínica organizada em um só lugar.
                     </h1>
 
                     <p>
-                        Tenha uma visão rápida da agenda,
-                        evolução dos pacientes e situação
-                        financeira da clínica.
+                        Acompanhe sua agenda, seus pacientes e a rotina da clínica com praticidade.
                     </p>
 
                     <button
                         class="btn btn-light"
                         onclick="openAppointmentModal()"
                     >
-                        <i class="bi bi-calendar-plus me-2"></i>
                         Agendar consulta
                     </button>
 
                 </div>
 
-                <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+                <div class="col-lg-4 d-flex justify-content-lg-end justify-content-center mt-4 mt-lg-0">
 
-                    <i
-                        class="bi bi-heart-pulse"
-                        style="font-size:90px;opacity:.2"
-                    ></i>
+                    <div class="hero-logo">
+
+                        <img
+                            src="assets/img2.png"
+                            alt="Joelma Negreiros Fisioterapeuta"
+                        >
+
+                    </div>
 
                 </div>
 
@@ -506,10 +899,13 @@ function adminDashboard() {
         <div class="row g-3 mt-1">
 
             <div class="col-md-6 col-xl-3">
+
                 <div class="stat-card">
 
                     <div class="stat-icon">
+
                         <i class="bi bi-calendar-check"></i>
+
                     </div>
 
                     <div class="stat-value">
@@ -521,13 +917,17 @@ function adminDashboard() {
                     </div>
 
                 </div>
+
             </div>
 
             <div class="col-md-6 col-xl-3">
+
                 <div class="stat-card">
 
                     <div class="stat-icon">
+
                         <i class="bi bi-people"></i>
+
                     </div>
 
                     <div class="stat-value">
@@ -539,13 +939,17 @@ function adminDashboard() {
                     </div>
 
                 </div>
+
             </div>
 
             <div class="col-md-6 col-xl-3">
+
                 <div class="stat-card">
 
                     <div class="stat-icon">
+
                         <i class="bi bi-wallet2"></i>
+
                     </div>
 
                     <div class="stat-value">
@@ -557,13 +961,17 @@ function adminDashboard() {
                     </div>
 
                 </div>
+
             </div>
 
             <div class="col-md-6 col-xl-3">
+
                 <div class="stat-card">
 
                     <div class="stat-icon">
+
                         <i class="bi bi-clock-history"></i>
+
                     </div>
 
                     <div class="stat-value">
@@ -575,6 +983,7 @@ function adminDashboard() {
                     </div>
 
                 </div>
+
             </div>
 
         </div>
@@ -590,7 +999,9 @@ function adminDashboard() {
 }
 
 function appointmentList(list) {
+
     if (!list.length) {
+
         return `
             <div class="empty-state">
 
@@ -602,84 +1013,79 @@ function appointmentList(list) {
         `;
     }
 
-    return list.map(appointment => {
+    return list
+        .map(
+            appointment => {
 
-        const initials =
-            patientName(appointment.patientId)
-                .split(' ')
-                .map(name => name[0])
-                .slice(0, 2)
-                .join('');
+                const initials =
+                    patientName(
+                        appointment.patientId
+                    )
+                        .split(' ')
+                        .map(
+                            name =>
+                                name[0]
+                        )
+                        .slice(0, 2)
+                        .join('');
 
-        return `
-            <div class="appointment-row">
+                return `
+                    <div class="appointment-row">
 
-                <div class="time-box">
+                        <div class="time-box">
+                            ${appointment.time}
+                        </div>
 
-                    ${appointment.time}
+                        <div class="patient-avatar">
+                            ${initials}
+                        </div>
 
-                    <small class="d-block text-muted">
-                        ${formatDate(appointment.date)}
-                    </small>
+                        <div class="flex-grow-1">
 
-                </div>
+                            <strong>
+                                ${patientName(appointment.patientId)}
+                            </strong>
 
-                <div class="patient-avatar">
-                    ${initials}
-                </div>
+                            <div class="text-muted small">
 
-                <div class="flex-grow-1">
+                                ${formatDate(appointment.date)}
+                                ·
+                                ${appointment.type}
 
-                    <strong>
-                        ${patientName(appointment.patientId)}
-                    </strong>
+                                ${
+                                    appointment.note
+                                        ? ` · ${appointment.note}`
+                                        : ''
+                                }
 
-                    <div class="text-muted small">
-                        ${appointment.type}
-                        ·
-                        ${appointment.note || 'Sem observações'}
+                            </div>
+
+                        </div>
+
+                        ${statusBadge(
+                            appointment.status
+                        )}
+
                     </div>
-
-                </div>
-
-                ${statusBadge(appointment.status)}
-
-            </div>
-        `;
-    }).join('');
+                `;
+            }
+        )
+        .join('');
 }
 
 function agenda() {
+
     return `
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="table-card">
 
-            <div>
-                <p class="text-muted mb-0">
-                    Organize horários, tipos de atendimento
-                    e status.
-                </p>
-            </div>
-
-            <button
-                class="btn btn-primary"
-                onclick="openAppointmentModal()"
-            >
-                <i class="bi bi-plus-lg me-2"></i>
-                Nova consulta
-            </button>
-
-        </div>
-
-        <div class="panel">
-
-            <div class="row g-3 mb-3">
+            <div class="row g-2 mb-3">
 
                 <div class="col-md-5">
 
                     <input
                         id="agendaSearch"
                         class="form-control"
-                        placeholder="Buscar paciente..."
+                        placeholder="Pesquisar paciente"
                         oninput="filterAgenda()"
                     >
 
@@ -689,15 +1095,14 @@ function agenda() {
 
                     <input
                         id="agendaDate"
-                        class="form-control"
                         type="date"
-                        value="${today()}"
+                        class="form-control"
                         onchange="filterAgenda()"
                     >
 
                 </div>
 
-                <div class="col-md-4">
+                <div class="col-md-2">
 
                     <select
                         id="agendaStatus"
@@ -706,7 +1111,7 @@ function agenda() {
                     >
 
                         <option value="">
-                            Todos os status
+                            Todos
                         </option>
 
                         <option>
@@ -725,10 +1130,25 @@ function agenda() {
 
                 </div>
 
+                <div class="col-md-2">
+
+                    <button
+                        class="btn btn-primary w-100"
+                        onclick="openAppointmentModal()"
+                    >
+                        Agendar
+                    </button>
+
+                </div>
+
             </div>
 
             <div id="agendaResults">
-                ${agendaTable(state.appointments)}
+
+                ${agendaTable(
+                    state.appointments
+                )}
+
             </div>
 
         </div>
@@ -736,7 +1156,9 @@ function agenda() {
 }
 
 function agendaTable(list) {
+
     if (!list.length) {
+
         return `
             <div class="empty-state">
 
@@ -748,13 +1170,17 @@ function agendaTable(list) {
         `;
     }
 
-    const sortedList = [...list].sort(
-        (a, b) =>
-            (a.date + a.time)
-                .localeCompare(
-                    b.date + b.time
+    const sortedList =
+        [...list].sort(
+            (a, b) =>
+                (
+                    a.date +
+                    a.time
+                ).localeCompare(
+                    b.date +
+                    b.time
                 )
-    );
+        );
 
     return `
         <div class="table-responsive">
@@ -764,81 +1190,104 @@ function agendaTable(list) {
                 <thead>
 
                     <tr>
-                        <th>Data</th>
-                        <th>Horário</th>
-                        <th>Paciente</th>
-                        <th>Atendimento</th>
-                        <th>Status</th>
-                        <th>Ação</th>
+
+                        <th>
+                            Data
+                        </th>
+
+                        <th>
+                            Horário
+                        </th>
+
+                        <th>
+                            Paciente
+                        </th>
+
+                        <th>
+                            Atendimento
+                        </th>
+
+                        <th>
+                            Status
+                        </th>
+
+                        <th>
+                            Ação
+                        </th>
+
                     </tr>
 
                 </thead>
 
                 <tbody>
 
-                    ${sortedList.map(appointment => `
+                    ${sortedList
+                        .map(
+                            appointment => `
+                                <tr>
 
-                        <tr>
+                                    <td>
+                                        ${formatDate(appointment.date)}
+                                    </td>
 
-                            <td>
-                                ${formatDate(appointment.date)}
-                            </td>
+                                    <td>
+                                        <strong>
+                                            ${appointment.time}
+                                        </strong>
+                                    </td>
 
-                            <td>
-                                <strong>
-                                    ${appointment.time}
-                                </strong>
-                            </td>
+                                    <td>
+                                        ${patientName(appointment.patientId)}
+                                    </td>
 
-                            <td>
-                                ${patientName(appointment.patientId)}
-                            </td>
+                                    <td>
+                                        ${appointment.type}
+                                    </td>
 
-                            <td>
-                                ${appointment.type}
-                            </td>
+                                    <td>
+                                        ${statusBadge(
+                                            appointment.status
+                                        )}
+                                    </td>
 
-                            <td>
-                                ${statusBadge(appointment.status)}
-                            </td>
+                                    <td>
 
-                            <td>
+                                        <select
+                                            class="form-select form-select-sm"
+                                            onchange="
+                                                changeAppointmentStatus(
+                                                    ${appointment.id},
+                                                    this.value
+                                                )
+                                            "
+                                        >
 
-                                <select
-                                    class="form-select form-select-sm"
-                                    onchange="
-                                        changeAppointmentStatus(
-                                            ${appointment.id},
-                                            this.value
-                                        )
-                                    "
-                                >
+                                            <option
+                                                ${appointment.status === 'Confirmada' ? 'selected' : ''}
+                                            >
+                                                Confirmada
+                                            </option>
 
-                                    <option
-                                        ${appointment.status === 'Confirmada' ? 'selected' : ''}
-                                    >
-                                        Confirmada
-                                    </option>
+                                            <option
+                                                ${appointment.status === 'Pendente' ? 'selected' : ''}
+                                            >
+                                                Pendente
+                                            </option>
 
-                                    <option
-                                        ${appointment.status === 'Pendente' ? 'selected' : ''}
-                                    >
-                                        Pendente
-                                    </option>
+                                            <option
+                                                ${appointment.status === 'Cancelada' ? 'selected' : ''}
+                                            >
+                                                Cancelada
+                                            </option>
 
-                                    <option
-                                        ${appointment.status === 'Cancelada' ? 'selected' : ''}
-                                    >
-                                        Cancelada
-                                    </option>
+                                        </select>
 
-                                </select>
+                                    </td>
 
-                            </td>
-
-                        </tr>
-
-                    `).join('')}
+                                </tr>
+                            `
+                        )
+                        .join('')}
 
                 </tbody>
 
@@ -849,66 +1298,87 @@ function agendaTable(list) {
 }
 
 function filterAgenda() {
+
     const search =
         (
-            document.getElementById('agendaSearch')?.value ||
+            document.getElementById(
+                'agendaSearch'
+            )?.value ||
             ''
         ).toLowerCase();
 
     const date =
-        document.getElementById('agendaDate')?.value ||
+        document.getElementById(
+            'agendaDate'
+        )?.value ||
         '';
 
     const status =
-        document.getElementById('agendaStatus')?.value ||
+        document.getElementById(
+            'agendaStatus'
+        )?.value ||
         '';
 
     const filteredList =
-        state.appointments.filter(appointment => {
+        state.appointments.filter(
+            appointment => {
 
-            const matchesSearch =
-                !search ||
-                patientName(
-                    appointment.patientId
-                )
-                    .toLowerCase()
-                    .includes(search);
+                const matchesSearch =
+                    !search ||
+                    patientName(
+                        appointment.patientId
+                    )
+                        .toLowerCase()
+                        .includes(search);
 
-            const matchesDate =
-                !date ||
-                appointment.date === date;
+                const matchesDate =
+                    !date ||
+                    appointment.date ===
+                    date;
 
-            const matchesStatus =
-                !status ||
-                appointment.status === status;
+                const matchesStatus =
+                    !status ||
+                    appointment.status ===
+                    status;
 
-            return (
-                matchesSearch &&
-                matchesDate &&
-                matchesStatus
-            );
-        });
+                return (
+                    matchesSearch &&
+                    matchesDate &&
+                    matchesStatus
+                );
+            }
+        );
 
     const results =
-        document.getElementById('agendaResults');
+        document.getElementById(
+            'agendaResults'
+        );
 
     if (results) {
         results.innerHTML =
-            agendaTable(filteredList);
+            agendaTable(
+                filteredList
+            );
     }
 }
 
-function changeAppointmentStatus(id, status) {
+function changeAppointmentStatus(
+    id,
+    status
+) {
+
     const appointment =
         state.appointments.find(
-            item => item.id === id
+            item =>
+                item.id === id
         );
 
     if (!appointment) {
         return;
     }
 
-    appointment.status = status;
+    appointment.status =
+        status;
 
     saveData();
 
@@ -921,22 +1391,19 @@ function changeAppointmentStatus(id, status) {
 }
 
 function patients() {
+
     return `
         <div class="d-flex justify-content-between align-items-center mb-3">
 
             <p class="text-muted mb-0">
-                Cadastro e acompanhamento básico
-                dos pacientes.
+                Cadastro e acompanhamento básico dos pacientes.
             </p>
 
             <button
                 class="btn btn-primary"
                 onclick="addPatient()"
             >
-
-                <i class="bi bi-person-plus me-2"></i>
                 Novo paciente
-
             </button>
 
         </div>
@@ -950,68 +1417,96 @@ function patients() {
                     <thead>
 
                         <tr>
-                            <th>Paciente</th>
-                            <th>Telefone</th>
-                            <th>Objetivo</th>
-                            <th>Consultas</th>
-                            <th>Última avaliação</th>
+
+                            <th>
+                                Paciente
+                            </th>
+
+                            <th>
+                                Telefone
+                            </th>
+
+                            <th>
+                                Objetivo
+                            </th>
+
+                            <th>
+                                Consultas
+                            </th>
+
+                            <th>
+                                Última avaliação
+                            </th>
+
                         </tr>
 
                     </thead>
 
                     <tbody>
 
-                        ${state.patients.map(patient => {
+                        ${state.patients
+                            .map(
+                                patient => {
 
-                            const count =
-                                state.appointments.filter(
-                                    appointment =>
-                                        appointment.patientId === patient.id
-                                ).length;
+                                    const count =
+                                        state.appointments.filter(
+                                            appointment =>
+                                                appointment.patientId ===
+                                                patient.id
+                                        ).length;
 
-                            const lastAssessment =
-                                state.assessments
-                                    .filter(
-                                        assessment =>
-                                            assessment.patientId === patient.id
-                                    )
-                                    .sort(
-                                        (a, b) =>
-                                            b.date.localeCompare(a.date)
-                                    )[0];
+                                    const lastAssessment =
+                                        state.assessments
+                                            .filter(
+                                                assessment =>
+                                                    assessment.patientId ===
+                                                    patient.id
+                                            )
+                                            .sort(
+                                                (a, b) =>
+                                                    b.date.localeCompare(
+                                                        a.date
+                                                    )
+                                            )[0];
 
-                            return `
-                                <tr>
+                                    return `
+                                        <tr>
 
-                                    <td>
-                                        <strong>
-                                            ${patient.name}
-                                        </strong>
-                                    </td>
+                                            <td>
 
-                                    <td>
-                                        ${patient.phone}
-                                    </td>
+                                                <strong>
+                                                    ${patient.name}
+                                                </strong>
 
-                                    <td>
-                                        ${patient.goal}
-                                    </td>
+                                            </td>
 
-                                    <td>
-                                        ${count}
-                                    </td>
+                                            <td>
+                                                ${patient.phone}
+                                            </td>
 
-                                    <td>
-                                        ${
-                                            lastAssessment
-                                                ? formatDate(lastAssessment.date)
-                                                : '—'
-                                        }
-                                    </td>
+                                            <td>
+                                                ${patient.goal}
+                                            </td>
 
-                                </tr>
-                            `;
-                        }).join('')}
+                                            <td>
+                                                ${count}
+                                            </td>
+
+                                            <td>
+                                                ${
+                                                    lastAssessment
+                                                        ? formatDate(
+                                                            lastAssessment.date
+                                                        )
+                                                        : 'Nenhuma'
+                                                }
+                                            </td>
+
+                                        </tr>
+                                    `;
+                                }
+                            )
+                            .join('')}
 
                     </tbody>
 
@@ -1024,19 +1519,26 @@ function patients() {
 }
 
 function addPatient() {
+
     const name =
-        prompt('Nome do paciente:');
+        prompt(
+            'Nome completo:'
+        );
 
     if (!name) {
         return;
     }
 
     const phone =
-        prompt('Telefone:') ||
+        prompt(
+            'Telefone:'
+        ) ||
         'Não informado';
 
     const goal =
-        prompt('Objetivo/tratamento:') ||
+        prompt(
+            'Objetivo/tratamento:'
+        ) ||
         'Acompanhamento fisioterapêutico';
 
     state.patients.push({
@@ -1047,7 +1549,6 @@ function addPatient() {
     });
 
     saveData();
-
     renderPage();
 
     toast(
@@ -1057,14 +1558,14 @@ function addPatient() {
 }
 
 function assessments() {
+
     return `
         <div class="d-flex justify-content-between align-items-center mb-3">
 
             <div>
 
                 <p class="text-muted mb-0">
-                    Registre evolução, medidas,
-                    observações e fotos de antes/depois.
+                    Registre evolução, medidas, observações e fotos de antes e depois.
                 </p>
 
             </div>
@@ -1073,10 +1574,7 @@ function assessments() {
                 class="btn btn-primary"
                 onclick="openAssessmentModal()"
             >
-
-                <i class="bi bi-clipboard-plus me-2"></i>
                 Nova avaliação
-
             </button>
 
         </div>
@@ -1099,7 +1597,11 @@ function assessments() {
     `;
 }
 
-function assessmentCard(assessment, user) {
+function assessmentCard(
+    assessment,
+    user
+) {
+
     return `
         <div class="col-xl-6">
 
@@ -1110,11 +1612,15 @@ function assessmentCard(assessment, user) {
                     <div>
 
                         <strong>
-                            ${patientName(assessment.patientId)}
+                            ${patientName(
+                                assessment.patientId
+                            )}
                         </strong>
 
                         <div class="text-muted small">
-                            ${formatDate(assessment.date)}
+                            ${formatDate(
+                                assessment.date
+                            )}
                         </div>
 
                     </div>
@@ -1148,7 +1654,7 @@ function assessmentCard(assessment, user) {
                                                 >
                                             `
                                             : `
-                                                <i class="bi bi-person-bounding-box fs-2"></i>
+                                                <i class="bi bi-image"></i>
                                             `
                                     }
 
@@ -1173,7 +1679,7 @@ function assessmentCard(assessment, user) {
                                                 >
                                             `
                                             : `
-                                                <i class="bi bi-person-check fs-2"></i>
+                                                <i class="bi bi-image"></i>
                                             `
                                     }
 
@@ -1189,7 +1695,7 @@ function assessmentCard(assessment, user) {
 
                         <div class="row g-2 mb-3">
 
-                            <div class="col-4">
+                            <div class="col-6">
 
                                 <div class="metric">
 
@@ -1198,14 +1704,38 @@ function assessmentCard(assessment, user) {
                                     </small>
 
                                     <strong>
-                                        ${assessment.weight || '—'} kg
+                                        ${
+                                            assessment.weight
+                                                ? `${assessment.weight} kg`
+                                                : '—'
+                                        }
                                     </strong>
 
                                 </div>
 
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-6">
+
+                                <div class="metric">
+
+                                    <small>
+                                        Altura
+                                    </small>
+
+                                    <strong>
+                                        ${
+                                            assessment.height
+                                                ? `${assessment.height} cm`
+                                                : '—'
+                                        }
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+                            <div class="col-6">
 
                                 <div class="metric">
 
@@ -1214,14 +1744,17 @@ function assessmentCard(assessment, user) {
                                     </small>
 
                                     <strong>
-                                        ${assessment.pain || '—'}/10
+                                        ${
+                                            assessment.pain ||
+                                            '—'
+                                        }
                                     </strong>
 
                                 </div>
 
                             </div>
 
-                            <div class="col-4">
+                            <div class="col-6">
 
                                 <div class="metric">
 
@@ -1229,8 +1762,11 @@ function assessmentCard(assessment, user) {
                                         Mobilidade
                                     </small>
 
-                                    <strong class="fs-6">
-                                        ${assessment.mobility || '—'}
+                                    <strong>
+                                        ${
+                                            assessment.mobility ||
+                                            '—'
+                                        }
                                     </strong>
 
                                 </div>
@@ -1239,16 +1775,20 @@ function assessmentCard(assessment, user) {
 
                         </div>
 
-                        <small class="text-muted">
-                            Observações
-                        </small>
+                        <div>
 
-                        <p class="small mt-1 mb-0">
-                            ${
-                                assessment.note ||
-                                'Sem observações.'
-                            }
-                        </p>
+                            <small class="text-muted">
+                                Observações
+                            </small>
+
+                            <p class="mb-0 mt-1">
+                                ${
+                                    assessment.note ||
+                                    'Nenhuma observação.'
+                                }
+                            </p>
+
+                        </div>
 
                     </div>
 
@@ -1261,15 +1801,36 @@ function assessmentCard(assessment, user) {
 }
 
 function payments() {
-    const received =
+
+    const total =
+        state.payments.reduce(
+            (
+                sum,
+                payment
+            ) =>
+                sum +
+                Number(
+                    payment.value
+                ),
+            0
+        );
+
+    const paid =
         state.payments
             .filter(
                 payment =>
-                    payment.status === 'Pago'
+                    payment.status ===
+                    'Pago'
             )
             .reduce(
-                (sum, payment) =>
-                    sum + Number(payment.value),
+                (
+                    sum,
+                    payment
+                ) =>
+                    sum +
+                    Number(
+                        payment.value
+                    ),
                 0
             );
 
@@ -1277,43 +1838,66 @@ function payments() {
         state.payments
             .filter(
                 payment =>
-                    payment.status === 'Pendente'
+                    payment.status ===
+                    'Pendente'
             )
             .reduce(
-                (sum, payment) =>
-                    sum + Number(payment.value),
+                (
+                    sum,
+                    payment
+                ) =>
+                    sum +
+                    Number(
+                        payment.value
+                    ),
                 0
             );
 
     return `
         <div class="row g-3 mb-3">
 
-            <div class="col-md-6">
+            <div class="col-md-4">
 
-                <div class="stat-card kpi">
-
-                    <div class="stat-value">
-                        ${money(received)}
-                    </div>
+                <div class="stat-card">
 
                     <div class="stat-label">
-                        Total recebido
+                        Total registrado
+                    </div>
+
+                    <div class="stat-value">
+                        ${money(total)}
                     </div>
 
                 </div>
 
             </div>
 
-            <div class="col-md-6">
+            <div class="col-md-4">
 
-                <div class="stat-card kpi">
+                <div class="stat-card">
+
+                    <div class="stat-label">
+                        Recebido
+                    </div>
+
+                    <div class="stat-value">
+                        ${money(paid)}
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="col-md-4">
+
+                <div class="stat-card">
+
+                    <div class="stat-label">
+                        A receber
+                    </div>
 
                     <div class="stat-value">
                         ${money(pending)}
-                    </div>
-
-                    <div class="stat-label">
-                        Total a receber
                     </div>
 
                 </div>
@@ -1322,34 +1906,18 @@ function payments() {
 
         </div>
 
+        <div class="d-flex justify-content-end mb-3">
+
+            <button
+                class="btn btn-primary"
+                onclick="addPayment()"
+            >
+                Novo pagamento
+            </button>
+
+        </div>
+
         <div class="table-card">
-
-            <div class="d-flex justify-content-between align-items-center mb-3">
-
-                <div>
-
-                    <strong>
-                        Controle financeiro
-                    </strong>
-
-                    <div class="text-muted small">
-                        Acompanhe cobranças e pagamentos
-                        dos pacientes.
-                    </div>
-
-                </div>
-
-                <button
-                    class="btn btn-primary btn-sm"
-                    onclick="addPayment()"
-                >
-
-                    <i class="bi bi-plus-lg me-1"></i>
-                    Lançar pagamento
-
-                </button>
-
-            </div>
 
             <div class="table-responsive">
 
@@ -1358,71 +1926,108 @@ function payments() {
                     <thead>
 
                         <tr>
-                            <th>Paciente</th>
-                            <th>Descrição</th>
-                            <th>Data</th>
-                            <th>Valor</th>
-                            <th>Método</th>
-                            <th>Status</th>
-                            <th></th>
+
+                            <th>
+                                Data
+                            </th>
+
+                            <th>
+                                Paciente
+                            </th>
+
+                            <th>
+                                Descrição
+                            </th>
+
+                            <th>
+                                Valor
+                            </th>
+
+                            <th>
+                                Método
+                            </th>
+
+                            <th>
+                                Status
+                            </th>
+
+                            <th>
+                                Ação
+                            </th>
+
                         </tr>
 
                     </thead>
 
                     <tbody>
 
-                        ${state.payments.map(payment => `
+                        ${
+                            state.payments.length
+                                ? state.payments
+                                    .map(
+                                        payment => `
+                                            <tr>
 
-                            <tr>
+                                                <td>
+                                                    ${formatDate(
+                                                        payment.date
+                                                    )}
+                                                </td>
 
-                                <td>
-                                    <strong>
-                                        ${patientName(payment.patientId)}
-                                    </strong>
-                                </td>
+                                                <td>
+                                                    ${patientName(
+                                                        payment.patientId
+                                                    )}
+                                                </td>
 
-                                <td>
-                                    ${payment.description}
-                                </td>
+                                                <td>
+                                                    ${payment.description}
+                                                </td>
 
-                                <td>
-                                    ${formatDate(payment.date)}
-                                </td>
+                                                <td>
+                                                    ${money(
+                                                        payment.value
+                                                    )}
+                                                </td>
 
-                                <td>
-                                    ${money(payment.value)}
-                                </td>
+                                                <td>
+                                                    ${payment.method}
+                                                </td>
 
-                                <td>
-                                    ${payment.method}
-                                </td>
+                                                <td>
+                                                    ${statusBadge(
+                                                        payment.status
+                                                    )}
+                                                </td>
 
-                                <td>
-                                    ${statusBadge(payment.status)}
-                                </td>
+                                                <td>
 
-                                <td>
+                                                    <button
+                                                        class="btn btn-sm btn-outline-primary"
+                                                        onclick="togglePayment(${payment.id})"
+                                                    >
+                                                        Alterar
+                                                    </button>
 
-                                    <button
-                                        class="btn btn-sm btn-light"
-                                        onclick="
-                                            togglePayment(
-                                                ${payment.id}
-                                            )
-                                        "
-                                    >
-                                        ${
-                                            payment.status === 'Pago'
-                                                ? 'Marcar pendente'
-                                                : 'Marcar pago'
-                                        }
-                                    </button>
+                                                </td>
 
-                                </td>
+                                            </tr>
+                                        `
+                                    )
+                                    .join('')
+                                : `
+                                    <tr>
 
-                            </tr>
+                                        <td
+                                            colspan="7"
+                                            class="text-center text-muted"
+                                        >
+                                            Nenhum pagamento registrado.
+                                        </td>
 
-                        `).join('')}
+                                    </tr>
+                                `
+                        }
 
                     </tbody>
 
@@ -1434,148 +2039,38 @@ function payments() {
     `;
 }
 
-function addPayment() {
-    const options =
-        state.patients
-            .map(
-                patient =>
-                    `${patient.id}: ${patient.name}`
-            )
-            .join('\n');
-
-    const id =
-        Number(
-            prompt(
-                `Digite o ID do paciente:\n${options}`
-            )
-        );
-
-    if (
-        !state.patients.some(
-            patient => patient.id === id
-        )
-    ) {
-        toast(
-            'Paciente não encontrado.',
-            'danger'
-        );
-
-        return;
-    }
-
-    const value =
-        Number(
-            prompt(
-                'Valor (R$):',
-                '90'
-            )
-        );
-
-    if (!value) {
-        return;
-    }
-
-    const description =
-        prompt(
-            'Descrição:',
-            'Sessão de fisioterapia'
-        ) || 'Serviço';
-
-    state.payments.push({
-        id: Date.now(),
-        patientId: id,
-        description,
-        date: today(),
-        value,
-        status: 'Pendente',
-        method: 'Pix'
-    });
-
-    saveData();
-
-    renderPage();
-
-    toast(
-        'Lançamento financeiro criado.',
-        'success'
-    );
-}
-
-function togglePayment(id) {
-    const payment =
-        state.payments.find(
-            item => item.id === id
-        );
-
-    if (!payment) {
-        return;
-    }
-
-    payment.status =
-        payment.status === 'Pago'
-            ? 'Pendente'
-            : 'Pago';
-
-    saveData();
-
-    renderPage();
-
-    toast(
-        'Pagamento atualizado.',
-        'success'
-    );
-}
-
 function reports() {
-    const total =
-        state.payments.reduce(
-            (sum, payment) =>
-                sum + Number(payment.value),
-            0
-        );
-
-    const paid =
-        state.payments
-            .filter(
-                payment =>
-                    payment.status === 'Pago'
-            )
-            .reduce(
-                (sum, payment) =>
-                    sum + Number(payment.value),
-                0
-            );
-
-    const cancelled =
-        state.appointments.filter(
-            appointment =>
-                appointment.status === 'Cancelada'
-        ).length;
-
-    const paymentRate =
-        total
-            ? Math.round((paid / total) * 100)
-            : 0;
 
     const confirmed =
         state.appointments.filter(
             appointment =>
-                appointment.status === 'Confirmada'
+                appointment.status ===
+                'Confirmada'
         ).length;
 
     const pending =
         state.appointments.filter(
             appointment =>
-                appointment.status === 'Pendente'
+                appointment.status ===
+                'Pendente'
+        ).length;
+
+    const cancelled =
+        state.appointments.filter(
+            appointment =>
+                appointment.status ===
+                'Cancelada'
         ).length;
 
     const patientsWithAssessment =
-        new Set(
-            state.assessments.map(
-                assessment =>
-                    assessment.patientId
-            )
-        ).size;
+        state.patients.filter(
+            patient =>
+                state.assessments.some(
+                    assessment =>
+                        assessment.patientId ===
+                        patient.id
+                )
+        ).length;
 
     return `
         <div class="row g-3">
@@ -1584,16 +2079,12 @@ function reports() {
 
                 <div class="stat-card">
 
-                    <div class="stat-icon">
-                        <i class="bi bi-cash-stack"></i>
+                    <div class="stat-label">
+                        Consultas confirmadas
                     </div>
 
                     <div class="stat-value">
-                        ${money(total)}
-                    </div>
-
-                    <div class="stat-label">
-                        Valor lançado
+                        ${confirmed}
                     </div>
 
                 </div>
@@ -1604,16 +2095,12 @@ function reports() {
 
                 <div class="stat-card">
 
-                    <div class="stat-icon">
-                        <i class="bi bi-graph-up-arrow"></i>
+                    <div class="stat-label">
+                        Consultas pendentes
                     </div>
 
                     <div class="stat-value">
-                        ${paymentRate}%
-                    </div>
-
-                    <div class="stat-label">
-                        Taxa de recebimento
+                        ${pending}
                     </div>
 
                 </div>
@@ -1624,16 +2111,12 @@ function reports() {
 
                 <div class="stat-card">
 
-                    <div class="stat-icon">
-                        <i class="bi bi-calendar-x"></i>
+                    <div class="stat-label">
+                        Consultas canceladas
                     </div>
 
                     <div class="stat-value">
                         ${cancelled}
-                    </div>
-
-                    <div class="stat-label">
-                        Consultas canceladas
                     </div>
 
                 </div>
@@ -1643,70 +2126,34 @@ function reports() {
         </div>
 
         <div class="section-title">
-            Resumo do sistema
+            Avaliações
         </div>
 
         <div class="panel">
 
-            <div class="row g-3">
-
-                <div class="col-md-6">
-
-                    <h6>
-                        Atendimentos por status
-                    </h6>
-
-                    <p class="mb-1">
-                        Confirmadas:
-                        <strong>
-                            ${confirmed}
-                        </strong>
-                    </p>
-
-                    <p class="mb-1">
-                        Pendentes:
-                        <strong>
-                            ${pending}
-                        </strong>
-                    </p>
-
-                    <p>
-                        Canceladas:
-                        <strong>
-                            ${cancelled}
-                        </strong>
-                    </p>
-
-                </div>
-
-                <div class="col-md-6">
-
-                    <h6>
-                        Pacientes com avaliação
-                    </h6>
-
-                    <p class="mb-0">
-
-                        ${patientsWithAssessment}
-                        de
-                        ${state.patients.length}
-
-                        pacientes possuem avaliação registrada.
-
-                    </p>
-
-                </div>
-
-            </div>
+            <p class="mb-0">
+                ${patientsWithAssessment}
+                de
+                ${state.patients.length}
+                pacientes possuem avaliação registrada.
+            </p>
 
         </div>
     `;
 }
 
 function userDashboard() {
-    const patient = state.patients[0];
+
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                state.currentPatientId
+        ) ||
+        state.patients[0];
 
     if (!patient) {
+
         return `
             <div class="alert alert-warning">
                 Nenhum paciente cadastrado.
@@ -1718,55 +2165,80 @@ function userDashboard() {
         state.appointments
             .filter(
                 appointment =>
-                    appointment.patientId === patient.id &&
-                    appointment.date >= today()
+                    appointment.patientId ===
+                    patient.id &&
+                    appointment.date >=
+                    today()
             )
             .sort(
-                (a, b) =>
-                    (a.date + a.time)
-                        .localeCompare(
-                            b.date + b.time
-                        )
+                (
+                    a,
+                    b
+                ) =>
+                    (
+                        a.date +
+                        a.time
+                    ).localeCompare(
+                        b.date +
+                        b.time
+                    )
             )[0];
 
     const last =
         state.assessments
             .filter(
                 assessment =>
-                    assessment.patientId === patient.id
+                    assessment.patientId ===
+                    patient.id
             )
             .sort(
-                (a, b) =>
-                    b.date.localeCompare(a.date)
+                (
+                    a,
+                    b
+                ) =>
+                    b.date.localeCompare(
+                        a.date
+                    )
             )[0];
 
     return `
         <div class="hero">
 
-            <h1>
-                Olá, ${patient.name.split(' ')[0]}! 🌿
-            </h1>
+            <div class="row align-items-center">
 
-            <p>
-                Acompanhe suas consultas,
-                avaliações físicas e orientações
-                da equipe da Clínica Joelma Negreiros.
-            </p>
+                <div class="col-lg-8">
 
-            <button
-                class="btn btn-light"
-                onclick="
-                    state.page='minhas-consultas';
-                    activateMenu();
-                    renderPage();
-                "
-            >
+                    <h1>
+                        Olá, ${patient.name}.
+                    </h1>
 
-                <i class="bi bi-calendar-check me-2"></i>
+                    <p>
+                        Acompanhe suas consultas, avaliações e informações da clínica.
+                    </p>
 
-                Ver minhas consultas
+                    <button
+                        class="btn btn-light"
+                        onclick="openAppointmentModal()"
+                    >
+                        Agendar consulta
+                    </button>
 
-            </button>
+                </div>
+
+                <div class="col-lg-4 d-flex justify-content-lg-end justify-content-center mt-4 mt-lg-0">
+
+                    <div class="hero-logo">
+
+                        <img
+                            src="assets/img2.png"
+                            alt="Joelma Negreiros Fisioterapeuta"
+                        >
+
+                    </div>
+
+                </div>
+
+            </div>
 
         </div>
 
@@ -1777,16 +2249,19 @@ function userDashboard() {
                 <div class="stat-card">
 
                     <div class="stat-icon">
-                        <i class="bi bi-calendar-heart"></i>
+                        <i class="bi bi-calendar-check"></i>
                     </div>
 
                     <div class="stat-value">
+
                         ${
                             state.appointments.filter(
                                 appointment =>
-                                    appointment.patientId === patient.id
+                                    appointment.patientId ===
+                                    patient.id
                             ).length
                         }
+
                     </div>
 
                     <div class="stat-label">
@@ -1806,12 +2281,15 @@ function userDashboard() {
                     </div>
 
                     <div class="stat-value">
+
                         ${
                             state.assessments.filter(
                                 assessment =>
-                                    assessment.patientId === patient.id
+                                    assessment.patientId ===
+                                    patient.id
                             ).length
                         }
+
                     </div>
 
                     <div class="stat-label">
@@ -1835,7 +2313,7 @@ function userDashboard() {
                     </div>
 
                     <div class="stat-label">
-                        Dor na última avaliação (0–10)
+                        Dor na última avaliação
                     </div>
 
                 </div>
@@ -1862,7 +2340,9 @@ function userDashboard() {
                             <div class="flex-grow-1">
 
                                 <strong>
-                                    ${formatDate(next.date)}
+                                    ${formatDate(
+                                        next.date
+                                    )}
                                     às
                                     ${next.time}
                                 </strong>
@@ -1873,7 +2353,9 @@ function userDashboard() {
 
                             </div>
 
-                            ${statusBadge(next.status)}
+                            ${statusBadge(
+                                next.status
+                            )}
 
                         </div>
                     `
@@ -1893,10 +2375,12 @@ function userDashboard() {
         <div class="panel">
 
             <p class="mb-0">
+
                 ${
                     last?.note ||
                     'Sua fisioterapeuta ainda não registrou uma observação.'
                 }
+
             </p>
 
         </div>
@@ -1904,9 +2388,17 @@ function userDashboard() {
 }
 
 function userAppointments() {
-    const patient = state.patients[0];
+
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                state.currentPatientId
+        ) ||
+        state.patients[0];
 
     if (!patient) {
+
         return `
             <div class="alert alert-warning">
                 Nenhum paciente cadastrado.
@@ -1917,19 +2409,35 @@ function userAppointments() {
     const list =
         state.appointments.filter(
             appointment =>
-                appointment.patientId === patient.id
+                appointment.patientId ===
+                patient.id
         );
 
     return `
         <div class="panel">
 
-            <h5 class="mb-1">
-                Minhas consultas
-            </h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
 
-            <p class="text-muted small">
-                Histórico e próximos atendimentos.
-            </p>
+                <div>
+
+                    <h5 class="mb-1">
+                        Minhas consultas
+                    </h5>
+
+                    <p class="text-muted small mb-0">
+                        Histórico e próximos atendimentos.
+                    </p>
+
+                </div>
+
+                <button
+                    class="btn btn-primary"
+                    onclick="openAppointmentModal()"
+                >
+                    Agendar consulta
+                </button>
+
+            </div>
 
             ${
                 list.length
@@ -1941,11 +2449,27 @@ function userAppointments() {
                                 <thead>
 
                                     <tr>
-                                        <th>Data</th>
-                                        <th>Horário</th>
-                                        <th>Atendimento</th>
-                                        <th>Status</th>
-                                        <th>Observação</th>
+
+                                        <th>
+                                            Data
+                                        </th>
+
+                                        <th>
+                                            Horário
+                                        </th>
+
+                                        <th>
+                                            Atendimento
+                                        </th>
+
+                                        <th>
+                                            Status
+                                        </th>
+
+                                        <th>
+                                            Observação
+                                        </th>
+
                                     </tr>
 
                                 </thead>
@@ -1954,42 +2478,53 @@ function userAppointments() {
 
                                     ${[...list]
                                         .sort(
-                                            (a, b) =>
-                                                (b.date + b.time)
-                                                    .localeCompare(
-                                                        a.date + a.time
-                                                    )
+                                            (
+                                                a,
+                                                b
+                                            ) =>
+                                                (
+                                                    b.date +
+                                                    b.time
+                                                ).localeCompare(
+                                                    a.date +
+                                                    a.time
+                                                )
                                         )
-                                        .map(appointment => `
+                                        .map(
+                                            appointment => `
+                                                <tr>
 
-                                            <tr>
+                                                    <td>
+                                                        ${formatDate(
+                                                            appointment.date
+                                                        )}
+                                                    </td>
 
-                                                <td>
-                                                    ${formatDate(appointment.date)}
-                                                </td>
+                                                    <td>
+                                                        ${appointment.time}
+                                                    </td>
 
-                                                <td>
-                                                    ${appointment.time}
-                                                </td>
+                                                    <td>
+                                                        ${appointment.type}
+                                                    </td>
 
-                                                <td>
-                                                    ${appointment.type}
-                                                </td>
+                                                    <td>
+                                                        ${statusBadge(
+                                                            appointment.status
+                                                        )}
+                                                    </td>
 
-                                                <td>
-                                                    ${statusBadge(appointment.status)}
-                                                </td>
+                                                    <td>
+                                                        ${
+                                                            appointment.note ||
+                                                            '—'
+                                                        }
+                                                    </td>
 
-                                                <td>
-                                                    ${
-                                                        appointment.note ||
-                                                        '—'
-                                                    }
-                                                </td>
-
-                                            </tr>
-
-                                        `).join('')}
+                                                </tr>
+                                            `
+                                        )
+                                        .join('')}
 
                                 </tbody>
 
@@ -2009,9 +2544,17 @@ function userAppointments() {
 }
 
 function userAssessments() {
-    const patient = state.patients[0];
+
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                state.currentPatientId
+        ) ||
+        state.patients[0];
 
     if (!patient) {
+
         return `
             <div class="alert alert-warning">
                 Nenhum paciente cadastrado.
@@ -2023,19 +2566,24 @@ function userAssessments() {
         state.assessments
             .filter(
                 assessment =>
-                    assessment.patientId === patient.id
+                    assessment.patientId ===
+                    patient.id
             )
             .sort(
-                (a, b) =>
-                    b.date.localeCompare(a.date)
+                (
+                    a,
+                    b
+                ) =>
+                    b.date.localeCompare(
+                        a.date
+                    )
             );
 
     return `
         <div class="mb-3">
 
             <p class="text-muted">
-                Aqui aparecem as avaliações e
-                observações liberadas pela clínica.
+                Aqui aparecem suas avaliações e observações liberadas pela clínica.
             </p>
 
         </div>
@@ -2069,9 +2617,17 @@ function userAssessments() {
 }
 
 function userPayments() {
-    const patient = state.patients[0];
+
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                state.currentPatientId
+        ) ||
+        state.patients[0];
 
     if (!patient) {
+
         return `
             <div class="alert alert-warning">
                 Nenhum paciente cadastrado.
@@ -2082,7 +2638,8 @@ function userPayments() {
     const list =
         state.payments.filter(
             payment =>
-                payment.patientId === patient.id
+                payment.patientId ===
+                patient.id
         );
 
     return `
@@ -2103,11 +2660,27 @@ function userPayments() {
                     <thead>
 
                         <tr>
-                            <th>Data</th>
-                            <th>Descrição</th>
-                            <th>Valor</th>
-                            <th>Método</th>
-                            <th>Status</th>
+
+                            <th>
+                                Data
+                            </th>
+
+                            <th>
+                                Descrição
+                            </th>
+
+                            <th>
+                                Valor
+                            </th>
+
+                            <th>
+                                Método
+                            </th>
+
+                            <th>
+                                Status
+                            </th>
+
                         </tr>
 
                     </thead>
@@ -2116,33 +2689,41 @@ function userPayments() {
 
                         ${
                             list.length
-                                ? list.map(payment => `
+                                ? list
+                                    .map(
+                                        payment => `
+                                            <tr>
 
-                                    <tr>
+                                                <td>
+                                                    ${formatDate(
+                                                        payment.date
+                                                    )}
+                                                </td>
 
-                                        <td>
-                                            ${formatDate(payment.date)}
-                                        </td>
+                                                <td>
+                                                    ${payment.description}
+                                                </td>
 
-                                        <td>
-                                            ${payment.description}
-                                        </td>
+                                                <td>
+                                                    ${money(
+                                                        payment.value
+                                                    )}
+                                                </td>
 
-                                        <td>
-                                            ${money(payment.value)}
-                                        </td>
+                                                <td>
+                                                    ${payment.method}
+                                                </td>
 
-                                        <td>
-                                            ${payment.method}
-                                        </td>
+                                                <td>
+                                                    ${statusBadge(
+                                                        payment.status
+                                                    )}
+                                                </td>
 
-                                        <td>
-                                            ${statusBadge(payment.status)}
-                                        </td>
-
-                                    </tr>
-
-                                `).join('')
+                                            </tr>
+                                        `
+                                    )
+                                    .join('')
                                 : `
                                     <tr>
 
@@ -2168,13 +2749,13 @@ function userPayments() {
 }
 
 function fillPatientSelect(id) {
+
     const element =
-        document.getElementById(id);
+        document.getElementById(
+            id
+        );
 
     if (!element) {
-        console.error(
-            `Elemento #${id} não encontrado.`
-        );
         return;
     }
 
@@ -2182,17 +2763,49 @@ function fillPatientSelect(id) {
         state.patients
             .map(
                 patient =>
-                    `<option value="${patient.id}">
-                        ${patient.name}
-                    </option>`
+                    `
+                        <option
+                            value="${patient.id}"
+                        >
+                            ${patient.name}
+                        </option>
+                    `
             )
             .join('');
 }
 
 function openAppointmentModal() {
+
     fillPatientSelect(
         'appointmentPatient'
     );
+
+    const patientSelect =
+        document.getElementById(
+            'appointmentPatient'
+        );
+
+    if (patientSelect) {
+
+        if (
+            state.role === 'user' &&
+            state.currentPatientId
+        ) {
+
+            patientSelect.value =
+                String(
+                    state.currentPatientId
+                );
+
+            patientSelect.disabled =
+                true;
+
+        } else {
+
+            patientSelect.disabled =
+                false;
+        }
+    }
 
     const date =
         document.getElementById(
@@ -2200,7 +2813,8 @@ function openAppointmentModal() {
         );
 
     if (date) {
-        date.value = today();
+        date.value =
+            today();
     }
 
     const modalElement =
@@ -2209,19 +2823,19 @@ function openAppointmentModal() {
         );
 
     if (!modalElement) {
-        console.error(
-            'Modal #appointmentModal não encontrado.'
-        );
         return;
     }
 
     const modal =
-        new bootstrap.Modal(modalElement);
+        new bootstrap.Modal(
+            modalElement
+        );
 
     modal.show();
 }
 
 function saveAppointment() {
+
     const form =
         document.getElementById(
             'appointmentForm'
@@ -2261,9 +2875,17 @@ function saveAppointment() {
             'appointmentNote'
         );
 
+    const patientId =
+        state.role === 'user' &&
+        state.currentPatientId
+            ? state.currentPatientId
+            : Number(
+                patient.value
+            );
+
     state.appointments.push({
         id: Date.now(),
-        patientId: Number(patient.value),
+        patientId,
         type: type.value,
         date: date.value,
         time: time.value,
@@ -2289,6 +2911,11 @@ function saveAppointment() {
 
     form.reset();
 
+    if (patient) {
+        patient.disabled =
+            false;
+    }
+
     renderPage();
 
     toast(
@@ -2297,32 +2924,8 @@ function saveAppointment() {
     );
 }
 
-function previewImage(input, target) {
-    const box =
-        document.getElementById(target);
-
-    if (!box || !input.files[0]) {
-        return;
-    }
-
-    const reader =
-        new FileReader();
-
-    reader.onload = event => {
-        box.innerHTML = `
-            <img
-                src="${event.target.result}"
-                alt="Pré-visualização"
-            >
-        `;
-    };
-
-    reader.readAsDataURL(
-        input.files[0]
-    );
-}
-
 function openAssessmentModal() {
+
     fillPatientSelect(
         'assessmentPatient'
     );
@@ -2333,19 +2936,19 @@ function openAssessmentModal() {
         );
 
     if (!modalElement) {
-        console.error(
-            'Modal #assessmentModal não encontrado.'
-        );
         return;
     }
 
     const modal =
-        new bootstrap.Modal(modalElement);
+        new bootstrap.Modal(
+            modalElement
+        );
 
     modal.show();
 }
 
 function saveAssessment() {
+
     const form =
         document.getElementById(
             'assessmentForm'
@@ -2400,99 +3003,266 @@ function saveAssessment() {
             'afterPhoto'
         );
 
-    const readImage = input => {
-        return new Promise(resolve => {
+    const readImage =
+        input => {
 
-            if (!input || !input.files[0]) {
-                resolve('');
-                return;
+            return new Promise(
+                resolve => {
+
+                    if (
+                        !input ||
+                        !input.files[0]
+                    ) {
+                        resolve('');
+                        return;
+                    }
+
+                    const reader =
+                        new FileReader();
+
+                    reader.onload =
+                        event =>
+                            resolve(
+                                event.target.result
+                            );
+
+                    reader.readAsDataURL(
+                        input.files[0]
+                    );
+                }
+            );
+        };
+
+    Promise.all(
+        [
+            readImage(
+                beforePhoto
+            ),
+            readImage(
+                afterPhoto
+            )
+        ]
+    ).then(
+        (
+            [
+                before,
+                after
+            ]
+        ) => {
+
+            state.assessments.push({
+                id: Date.now(),
+                patientId:
+                    Number(
+                        patient.value
+                    ),
+                date: today(),
+                weight:
+                    weight.value,
+                height:
+                    height.value,
+                pain:
+                    pain.value,
+                mobility:
+                    mobility.value,
+                note:
+                    note.value,
+                before,
+                after
+            });
+
+            saveData();
+
+            const modalElement =
+                document.getElementById(
+                    'assessmentModal'
+                );
+
+            const modal =
+                bootstrap.Modal.getInstance(
+                    modalElement
+                );
+
+            if (modal) {
+                modal.hide();
             }
 
-            const reader =
-                new FileReader();
+            form.reset();
 
-            reader.onload =
-                event =>
-                    resolve(
-                        event.target.result
-                    );
+            const beforePreview =
+                document.getElementById(
+                    'beforePreview'
+                );
 
-            reader.readAsDataURL(
-                input.files[0]
+            const afterPreview =
+                document.getElementById(
+                    'afterPreview'
+                );
+
+            if (beforePreview) {
+                beforePreview.innerHTML = `
+                    <i class="bi bi-image"></i>
+                    <span>Pré-visualização</span>
+                `;
+            }
+
+            if (afterPreview) {
+                afterPreview.innerHTML = `
+                    <i class="bi bi-image"></i>
+                    <span>Pré-visualização</span>
+                `;
+            }
+
+            renderPage();
+
+            toast(
+                'Avaliação registrada e disponível na área do paciente.',
+                'success'
             );
-        });
-    };
-
-    Promise.all([
-        readImage(beforePhoto),
-        readImage(afterPhoto)
-    ]).then(([before, after]) => {
-
-        state.assessments.push({
-            id: Date.now(),
-            patientId: Number(patient.value),
-            date: today(),
-            weight: weight.value,
-            height: height.value,
-            pain: pain.value,
-            mobility: mobility.value,
-            note: note.value,
-            before,
-            after
-        });
-
-        saveData();
-
-        const modalElement =
-            document.getElementById(
-                'assessmentModal'
-            );
-
-        const modal =
-            bootstrap.Modal.getInstance(
-                modalElement
-            );
-
-        if (modal) {
-            modal.hide();
         }
-
-        form.reset();
-
-        const beforePreview =
-            document.getElementById(
-                'beforePreview'
-            );
-
-        const afterPreview =
-            document.getElementById(
-                'afterPreview'
-            );
-
-        if (beforePreview) {
-            beforePreview.innerHTML = `
-                <i class="bi bi-image"></i>
-                <span>Pré-visualização</span>
-            `;
-        }
-
-        if (afterPreview) {
-            afterPreview.innerHTML = `
-                <i class="bi bi-image"></i>
-                <span>Pré-visualização</span>
-            `;
-        }
-
-        renderPage();
-
-        toast(
-            'Avaliação registrada e disponível na área do paciente.',
-            'success'
-        );
-    });
+    );
 }
 
-function toast(message, type = 'success') {
+function previewImage(
+    input,
+    target
+) {
+
+    const box =
+        document.getElementById(
+            target
+        );
+
+    if (
+        !box ||
+        !input.files[0]
+    ) {
+        return;
+    }
+
+    const reader =
+        new FileReader();
+
+    reader.onload =
+        event => {
+
+            box.innerHTML = `
+                <img
+                    src="${event.target.result}"
+                    alt="Pré-visualização"
+                >
+            `;
+        };
+
+    reader.readAsDataURL(
+        input.files[0]
+    );
+}
+
+function addPayment() {
+
+    if (!state.patients.length) {
+        return;
+    }
+
+    const patientId =
+        Number(
+            prompt(
+                'ID do paciente:'
+            )
+        );
+
+    const patient =
+        state.patients.find(
+            item =>
+                item.id ===
+                patientId
+        );
+
+    if (!patient) {
+        toast(
+            'Paciente não encontrado.',
+            'danger'
+        );
+        return;
+    }
+
+    const description =
+        prompt(
+            'Descrição:'
+        ) ||
+        'Pagamento';
+
+    const value =
+        Number(
+            prompt(
+                'Valor:'
+            )
+        );
+
+    if (
+        !value ||
+        value <= 0
+    ) {
+        return;
+    }
+
+    const method =
+        prompt(
+            'Método de pagamento:'
+        ) ||
+        'Pix';
+
+    state.payments.push({
+        id: Date.now(),
+        patientId,
+        description,
+        date: today(),
+        value,
+        status: 'Pendente',
+        method
+    });
+
+    saveData();
+    renderPage();
+
+    toast(
+        'Pagamento registrado.',
+        'success'
+    );
+}
+
+function togglePayment(id) {
+
+    const payment =
+        state.payments.find(
+            item =>
+                item.id === id
+        );
+
+    if (!payment) {
+        return;
+    }
+
+    payment.status =
+        payment.status === 'Pago'
+            ? 'Pendente'
+            : 'Pago';
+
+    saveData();
+    renderPage();
+
+    toast(
+        'Status do pagamento atualizado.',
+        'success'
+    );
+}
+
+function toast(
+    message,
+    type = 'success'
+) {
+
     const toastArea =
         document.getElementById(
             'toastArea'
@@ -2503,7 +3273,9 @@ function toast(message, type = 'success') {
     }
 
     const element =
-        document.createElement('div');
+        document.createElement(
+            'div'
+        );
 
     element.className =
         `toast align-items-center text-bg-${type} border-0`;
@@ -2512,11 +3284,7 @@ function toast(message, type = 'success') {
         <div class="d-flex">
 
             <div class="toast-body">
-
-                <i class="bi bi-check-circle me-2"></i>
-
                 ${message}
-
             </div>
 
             <button
@@ -2527,13 +3295,15 @@ function toast(message, type = 'success') {
         </div>
     `;
 
-    toastArea.appendChild(element);
+    toastArea.appendChild(
+        element
+    );
 
     const toastInstance =
         new bootstrap.Toast(
             element,
             {
-                delay: 2800
+                delay:2800
             }
         );
 
@@ -2541,29 +3311,67 @@ function toast(message, type = 'success') {
 
     element.addEventListener(
         'hidden.bs.toast',
-        () => element.remove()
+        () =>
+            element.remove()
     );
 }
 
-window.login = login;
-window.logout = logout;
-window.toggleSidebar = toggleSidebar;
-window.toggleTheme = toggleTheme;
-window.openAppointmentModal = openAppointmentModal;
-window.saveAppointment = saveAppointment;
-window.filterAgenda = filterAgenda;
-window.changeAppointmentStatus = changeAppointmentStatus;
-window.addPatient = addPatient;
-window.openAssessmentModal = openAssessmentModal;
-window.saveAssessment = saveAssessment;
-window.previewImage = previewImage;
-window.addPayment = addPayment;
-window.togglePayment = togglePayment;
+window.login =
+    login;
+
+window.logout =
+    logout;
+
+window.toggleSidebar =
+    toggleSidebar;
+
+window.toggleTheme =
+    toggleTheme;
+
+window.openRegisterModal =
+    openRegisterModal;
+
+window.registerPatient =
+    registerPatient;
+
+window.openAppointmentModal =
+    openAppointmentModal;
+
+window.saveAppointment =
+    saveAppointment;
+
+window.filterAgenda =
+    filterAgenda;
+
+window.changeAppointmentStatus =
+    changeAppointmentStatus;
+
+window.addPatient =
+    addPatient;
+
+window.openAssessmentModal =
+    openAssessmentModal;
+
+window.saveAssessment =
+    saveAssessment;
+/////
+window.previewImage =
+    previewImage;
+
+window.addPayment =
+    addPayment;
+
+window.togglePayment =
+    togglePayment;
 
 loadData();
 
 if (
-    localStorage.getItem('jf_dark') === 'true'
+    localStorage.getItem(
+        'jf_dark'
+    ) === 'true'
 ) {
-    document.body.classList.add('dark-mode');
+    document.body.classList.add(
+        'dark-mode'
+    );
 }
