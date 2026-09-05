@@ -1437,9 +1437,10 @@ function patients() {
                             <th>
                                 Última avaliação
                             </th>
-
+                            <th>
+                                Ações
+                            </th>
                         </tr>
-
                     </thead>
 
                     <tbody>
@@ -1501,6 +1502,14 @@ function patients() {
                                                         : 'Nenhuma'
                                                 }
                                             </td>
+                                            <td>
+                                                <button
+                                                class="btn btn-sm btn-outline-danger"
+                                                onclick="deletePatient(${patient.id})"
+                                                >
+                                                Excluir
+                                                </button>
+                                            </td>
 
                                         </tr>
                                     `;
@@ -1553,6 +1562,65 @@ function addPatient() {
 
     toast(
         'Paciente cadastrado.',
+        'success'
+    );
+}
+function deletePatient(id) {
+
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    const patient = state.patients.find(
+        item => item.id === id
+    );
+
+    if (!patient) {
+        return;
+    }
+
+    const confirmed = confirm(
+        `Deseja realmente excluir o paciente ${patient.name}?`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    state.patients = state.patients.filter(
+        item => item.id !== id
+    );
+
+    state.appointments = state.appointments.filter(
+        item => item.patientId !== id
+    );
+
+    state.assessments = state.assessments.filter(
+        item => item.patientId !== id
+    );
+
+    state.payments = state.payments.filter(
+        item => item.patientId !== id
+    );
+
+    const accounts = JSON.parse(
+        localStorage.getItem('jf_accounts') || '[]'
+    );
+
+    const updatedAccounts = accounts.filter(
+        item => item.patientId !== id
+    );
+
+    localStorage.setItem(
+        'jf_accounts',
+        JSON.stringify(updatedAccounts)
+    );
+
+    saveData();
+    renderPage();
+
+    toast(
+        'Paciente excluído com sucesso.',
         'success'
     );
 }
