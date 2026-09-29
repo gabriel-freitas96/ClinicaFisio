@@ -1,3 +1,6 @@
+let editingPatientId = null;
+let editingAssessmentId = null;
+
 const state = {
     role: 'admin',
     page: 'dashboard',
@@ -1391,238 +1394,238 @@ function changeAppointmentStatus(
 }
 
 function patients() {
-
     return `
-        <div class="d-flex justify-content-between align-items-center mb-3">
-
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
             <p class="text-muted mb-0">
                 Cadastro e acompanhamento básico dos pacientes.
             </p>
-
             <button
                 class="btn btn-primary"
+                type="button"
                 onclick="addPatient()"
             >
+                <i class="bi bi-person-plus me-2"></i>
                 Novo paciente
             </button>
-
         </div>
 
         <div class="table-card">
-
             <div class="table-responsive">
-
                 <table class="table align-middle">
-
                     <thead>
-
                         <tr>
-
-                            <th>
-                                Paciente
-                            </th>
-
-                            <th>
-                                Telefone
-                            </th>
-
-                            <th>
-                                Objetivo
-                            </th>
-
-                            <th>
-                                Consultas
-                            </th>
-
-                            <th>
-                                Última avaliação
-                            </th>
-                            <th>
-                                Ações
-                            </th>
+                            <th>Paciente</th>
+                            <th>Telefone</th>
+                            <th>Objetivo</th>
+                            <th>Consultas</th>
+                            <th>Última avaliação</th>
+                            <th class="text-end">Ações</th>
                         </tr>
                     </thead>
-
                     <tbody>
+                        ${state.patients.length
+                            ? state.patients.map(patient => {
+                                const count = state.appointments.filter(
+                                    appointment => appointment.patientId === patient.id
+                                ).length;
 
-                        ${state.patients
-                            .map(
-                                patient => {
+                                const lastAssessment = state.assessments
+                                    .filter(assessment => assessment.patientId === patient.id)
+                                    .sort((a, b) => b.date.localeCompare(a.date))[0];
 
-                                    const count =
-                                        state.appointments.filter(
-                                            appointment =>
-                                                appointment.patientId ===
-                                                patient.id
-                                        ).length;
-
-                                    const lastAssessment =
-                                        state.assessments
-                                            .filter(
-                                                assessment =>
-                                                    assessment.patientId ===
-                                                    patient.id
-                                            )
-                                            .sort(
-                                                (a, b) =>
-                                                    b.date.localeCompare(
-                                                        a.date
-                                                    )
-                                            )[0];
-
-                                    return `
-                                        <tr>
-
-                                            <td>
-
-                                                <strong>
-                                                    ${patient.name}
-                                                </strong>
-
-                                            </td>
-
-                                            <td>
-                                                ${patient.phone}
-                                            </td>
-
-                                            <td>
-                                                ${patient.goal}
-                                            </td>
-
-                                            <td>
-                                                ${count}
-                                            </td>
-
-                                            <td>
-                                                ${
-                                                    lastAssessment
-                                                        ? formatDate(
-                                                            lastAssessment.date
-                                                        )
-                                                        : 'Nenhuma'
-                                                }
-                                            </td>
-                                            <td>
+                                return `
+                                    <tr>
+                                        <td><strong>${patient.name}</strong></td>
+                                        <td>${patient.phone || 'Não informado'}</td>
+                                        <td>${patient.goal || 'Acompanhamento fisioterapêutico'}</td>
+                                        <td>${count}</td>
+                                        <td>${lastAssessment ? formatDate(lastAssessment.date) : 'Nenhuma'}</td>
+                                        <td class="text-end text-nowrap">
+                                            <div class="d-inline-flex gap-2">
                                                 <button
-                                                class="btn btn-sm btn-outline-danger"
-                                                onclick="deletePatient(${patient.id})"
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    type="button"
+                                                    onclick="editPatient(${Number(patient.id)})"
+                                                    aria-label="Editar paciente ${patient.name}"
                                                 >
-                                                Excluir
+                                                    <i class="bi bi-pencil-square me-1"></i>Editar
                                                 </button>
-                                            </td>
-
-                                        </tr>
-                                    `;
-                                }
-                            )
-                            .join('')}
-
+                                                <button
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    type="button"
+                                                    onclick="deletePatient(${Number(patient.id)})"
+                                                    aria-label="Excluir paciente ${patient.name}"
+                                                >
+                                                    <i class="bi bi-trash me-1"></i>Excluir
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')
+                            : `
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        Nenhum paciente cadastrado.
+                                    </td>
+                                </tr>
+                            `}
                     </tbody>
-
                 </table>
-
             </div>
-
         </div>
     `;
 }
 
 function addPatient() {
-
-    const name =
-        prompt(
-            'Nome completo:'
-        );
-
-    if (!name) {
-        return;
-    }
-
-    const phone =
-        prompt(
-            'Telefone:'
-        ) ||
-        'Não informado';
-
-    const goal =
-        prompt(
-            'Objetivo/tratamento:'
-        ) ||
-        'Acompanhamento fisioterapêutico';
-
-    state.patients.push({
-        id: Date.now(),
-        name,
-        phone,
-        goal
-    });
-
-    saveData();
-    renderPage();
-
-    toast(
-        'Paciente cadastrado.',
-        'success'
-    );
+    openPatientModal();
 }
-function deletePatient(id) {
 
+function editPatient(id) {
     if (state.role !== 'admin') {
         return;
     }
 
-    const patient = state.patients.find(
-        item => item.id === id
-    );
+    openPatientModal(id);
+}
 
+function openPatientModal(patientId = null) {
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    const form = document.getElementById('patientForm');
+    const modalElement = document.getElementById('patientModal');
+    if (!form || !modalElement) {
+        return;
+    }
+
+    form.reset();
+    editingPatientId = patientId === null ? null : Number(patientId);
+
+    const patient = editingPatientId === null
+        ? null
+        : state.patients.find(item => item.id === editingPatientId);
+
+    if (editingPatientId !== null && !patient) {
+        editingPatientId = null;
+        toast('Paciente não encontrado.', 'danger');
+        return;
+    }
+
+    document.getElementById('patientModalTitle').textContent =
+        patient ? 'Editar paciente' : 'Cadastrar paciente';
+    document.getElementById('patientSaveButton').textContent =
+        patient ? 'Salvar alterações' : 'Cadastrar paciente';
+
+    if (patient) {
+        document.getElementById('patientName').value = patient.name || '';
+        document.getElementById('patientPhone').value = patient.phone || '';
+        document.getElementById('patientGoal').value = patient.goal || '';
+    }
+
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function savePatient() {
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    const form = document.getElementById('patientForm');
+    if (!form) {
+        return;
+    }
+
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const name = document.getElementById('patientName').value.trim();
+    const phone = document.getElementById('patientPhone').value.trim();
+    const goal = document.getElementById('patientGoal').value.trim() ||
+        'Acompanhamento fisioterapêutico';
+
+    if (!name) {
+        toast('Informe o nome do paciente.', 'warning');
+        return;
+    }
+
+    if (editingPatientId !== null) {
+        const index = state.patients.findIndex(
+            item => item.id === editingPatientId
+        );
+
+        if (index === -1) {
+            toast('Paciente não encontrado.', 'danger');
+            return;
+        }
+
+        state.patients[index] = {
+            ...state.patients[index],
+            name,
+            phone: phone || 'Não informado',
+            goal
+        };
+    } else {
+        state.patients.push({
+            id: Date.now(),
+            name,
+            phone: phone || 'Não informado',
+            goal
+        });
+    }
+
+    const wasEditing = editingPatientId !== null;
+    saveData();
+    bootstrap.Modal.getOrCreateInstance(
+        document.getElementById('patientModal')
+    ).hide();
+    form.reset();
+    editingPatientId = null;
+    renderPage();
+    toast(
+        wasEditing ? 'Dados do paciente atualizados.' : 'Paciente cadastrado.',
+        'success'
+    );
+}
+
+function deletePatient(id) {
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    const patient = state.patients.find(item => item.id === Number(id));
     if (!patient) {
+        toast('Paciente não encontrado.', 'danger');
         return;
     }
 
-    const confirmed = confirm(
-        `Deseja realmente excluir o paciente ${patient.name}?`
-    );
-
-    if (!confirmed) {
+    if (!confirm(`Deseja realmente excluir o paciente ${patient.name}? Essa ação também removerá consultas, avaliações e pagamentos vinculados.`)) {
         return;
     }
 
-    state.patients = state.patients.filter(
-        item => item.id !== id
-    );
-
+    state.patients = state.patients.filter(item => item.id !== patient.id);
     state.appointments = state.appointments.filter(
-        item => item.patientId !== id
+        appointment => appointment.patientId !== patient.id
     );
-
     state.assessments = state.assessments.filter(
-        item => item.patientId !== id
+        assessment => assessment.patientId !== patient.id
     );
-
     state.payments = state.payments.filter(
-        item => item.patientId !== id
+        payment => payment.patientId !== patient.id
     );
 
-    const accounts = JSON.parse(
-        localStorage.getItem('jf_accounts') || '[]'
-    );
-
-    const updatedAccounts = accounts.filter(
-        item => item.patientId !== id
-    );
-
+    const accounts = JSON.parse(localStorage.getItem('jf_accounts') || '[]');
     localStorage.setItem(
         'jf_accounts',
-        JSON.stringify(updatedAccounts)
+        JSON.stringify(accounts.filter(account => account.patientId !== patient.id))
     );
 
     saveData();
     renderPage();
-
-    toast(
-        'Paciente excluído com sucesso.',
-        'success'
-    );
+    toast('Paciente excluído com sucesso.', 'success');
 }
 
 function assessments() {
@@ -1693,9 +1696,21 @@ function assessmentCard(
 
                     </div>
 
-                    <span class="badge-soft badge-confirmed">
-                        Evolução
-                    </span>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge-soft badge-confirmed">
+                            Evolução
+                        </span>
+                        ${user ? '' : `
+                            <button
+                                class="btn btn-sm btn-outline-primary"
+                                type="button"
+                                onclick="openAssessmentModal(${Number(assessment.id)})"
+                                aria-label="Editar avaliação de ${patientName(assessment.patientId)}"
+                            >
+                                <i class="bi bi-pencil-square me-1"></i>Editar
+                            </button>
+                        `}
+                    </div>
 
                 </div>
 
@@ -1842,6 +1857,29 @@ function assessmentCard(
                             </div>
 
                         </div>
+
+                        ${assessment.bodyFat || assessment.muscleMass || assessment.bodyWater || assessment.visceralFat || assessment.basalMetabolism ? `
+                            <div class="mb-3">
+                                <small class="text-muted">Bioimpedância</small>
+                                <div class="row g-2 mt-1">
+                                    <div class="col-6 col-lg-4">
+                                        <div class="metric"><small>Gordura corporal</small><strong>${assessment.bodyFat ? `${assessment.bodyFat}%` : '—'}</strong></div>
+                                    </div>
+                                    <div class="col-6 col-lg-4">
+                                        <div class="metric"><small>Massa muscular</small><strong>${assessment.muscleMass ? `${assessment.muscleMass} kg` : '—'}</strong></div>
+                                    </div>
+                                    <div class="col-6 col-lg-4">
+                                        <div class="metric"><small>Água corporal</small><strong>${assessment.bodyWater ? `${assessment.bodyWater}%` : '—'}</strong></div>
+                                    </div>
+                                    <div class="col-6 col-lg-4">
+                                        <div class="metric"><small>Gordura visceral</small><strong>${assessment.visceralFat || '—'}</strong></div>
+                                    </div>
+                                    <div class="col-6 col-lg-4">
+                                        <div class="metric"><small>Metabolismo basal</small><strong>${assessment.basalMetabolism ? `${assessment.basalMetabolism} kcal` : '—'}</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
 
                         <div>
 
@@ -2992,36 +3030,101 @@ function saveAppointment() {
     );
 }
 
-function openAssessmentModal() {
-
-    fillPatientSelect(
-        'assessmentPatient'
-    );
-
-    const modalElement =
-        document.getElementById(
-            'assessmentModal'
-        );
-
-    if (!modalElement) {
+function setAssessmentPhotoPreview(targetId, source, label) {
+    const box = document.getElementById(targetId);
+    if (!box) {
         return;
     }
 
-    const modal =
-        new bootstrap.Modal(
-            modalElement
-        );
-
-    modal.show();
+    box.innerHTML = source
+        ? `<img src="${source}" alt="Foto ${label}">`
+        : '<i class="bi bi-image"></i><span>Pré-visualização</span>';
 }
 
-function saveAssessment() {
+function resetAssessmentForm() {
+    const form = document.getElementById('assessmentForm');
+    if (form) {
+        form.reset();
+    }
 
-    const form =
-        document.getElementById(
-            'assessmentForm'
-        );
+    setAssessmentPhotoPreview('beforePreview', '', 'do antes');
+    setAssessmentPhotoPreview('afterPreview', '', 'do depois');
+    editingAssessmentId = null;
 
+    const date = document.getElementById('assessmentDate');
+    if (date) {
+        date.value = today();
+    }
+
+    const title = document.getElementById('assessmentModalTitle');
+    const saveButton = document.getElementById('assessmentSaveButton');
+    if (title) {
+        title.innerHTML = '<i class="bi bi-clipboard2-pulse me-2"></i> Registrar avaliação física';
+    }
+    if (saveButton) {
+        saveButton.textContent = 'Salvar avaliação';
+    }
+}
+
+function openAssessmentModal(assessmentId = null) {
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    if (!state.patients.length) {
+        toast('Cadastre um paciente antes de registrar uma avaliação.', 'warning');
+        return;
+    }
+
+    const form = document.getElementById('assessmentForm');
+    const modalElement = document.getElementById('assessmentModal');
+    if (!form || !modalElement) {
+        return;
+    }
+
+    resetAssessmentForm();
+    fillPatientSelect('assessmentPatient');
+    editingAssessmentId = assessmentId === null ? null : Number(assessmentId);
+
+    const assessment = editingAssessmentId === null
+        ? null
+        : state.assessments.find(item => item.id === editingAssessmentId);
+
+    if (editingAssessmentId !== null && !assessment) {
+        editingAssessmentId = null;
+        toast('Avaliação não encontrada.', 'danger');
+        return;
+    }
+
+    if (assessment) {
+        document.getElementById('assessmentPatient').value = String(assessment.patientId);
+        document.getElementById('assessmentDate').value = assessment.date || today();
+        document.getElementById('weight').value = assessment.weight || '';
+        document.getElementById('height').value = assessment.height || '';
+        document.getElementById('pain').value = assessment.pain || '';
+        document.getElementById('mobility').value = assessment.mobility || '';
+        document.getElementById('bodyFat').value = assessment.bodyFat || '';
+        document.getElementById('muscleMass').value = assessment.muscleMass || '';
+        document.getElementById('bodyWater').value = assessment.bodyWater || '';
+        document.getElementById('visceralFat').value = assessment.visceralFat || '';
+        document.getElementById('basalMetabolism').value = assessment.basalMetabolism || '';
+        document.getElementById('assessmentNote').value = assessment.note || '';
+        setAssessmentPhotoPreview('beforePreview', assessment.before || '', 'do antes');
+        setAssessmentPhotoPreview('afterPreview', assessment.after || '', 'do depois');
+
+        document.getElementById('assessmentModalTitle').innerHTML = '<i class="bi bi-clipboard2-pulse me-2"></i> Editar avaliação física';
+        document.getElementById('assessmentSaveButton').textContent = 'Salvar alterações';
+    }
+
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+async function saveAssessment() {
+    if (state.role !== 'admin') {
+        return;
+    }
+
+    const form = document.getElementById('assessmentForm');
     if (!form) {
         return;
     }
@@ -3031,164 +3134,77 @@ function saveAssessment() {
         return;
     }
 
-    const patient =
-        document.getElementById(
-            'assessmentPatient'
-        );
+    const patient = document.getElementById('assessmentPatient');
+    const date = document.getElementById('assessmentDate');
+    const beforePhoto = document.getElementById('beforePhoto');
+    const afterPhoto = document.getElementById('afterPhoto');
+    const existing = editingAssessmentId === null
+        ? null
+        : state.assessments.find(item => item.id === editingAssessmentId);
 
-    const weight =
-        document.getElementById(
-            'weight'
-        );
+    if (editingAssessmentId !== null && !existing) {
+        toast('Avaliação não encontrada.', 'danger');
+        return;
+    }
 
-    const height =
-        document.getElementById(
-            'height'
-        );
+    const readImage = input => new Promise((resolve, reject) => {
+        if (!input || !input.files || !input.files[0]) {
+            resolve('');
+            return;
+        }
 
-    const pain =
-        document.getElementById(
-            'pain'
-        );
+        const reader = new FileReader();
+        reader.onload = event => resolve(event.target.result);
+        reader.onerror = () => reject(new Error('Não foi possível ler uma das imagens.'));
+        reader.readAsDataURL(input.files[0]);
+    });
 
-    const mobility =
-        document.getElementById(
-            'mobility'
-        );
+    try {
+        const [newBefore, newAfter] = await Promise.all([
+            readImage(beforePhoto),
+            readImage(afterPhoto)
+        ]);
 
-    const note =
-        document.getElementById(
-            'assessmentNote'
-        );
-
-    const beforePhoto =
-        document.getElementById(
-            'beforePhoto'
-        );
-
-    const afterPhoto =
-        document.getElementById(
-            'afterPhoto'
-        );
-
-    const readImage =
-        input => {
-
-            return new Promise(
-                resolve => {
-
-                    if (
-                        !input ||
-                        !input.files[0]
-                    ) {
-                        resolve('');
-                        return;
-                    }
-
-                    const reader =
-                        new FileReader();
-
-                    reader.onload =
-                        event =>
-                            resolve(
-                                event.target.result
-                            );
-
-                    reader.readAsDataURL(
-                        input.files[0]
-                    );
-                }
-            );
+        const data = {
+            ...(existing || {}),
+            id: existing ? existing.id : Date.now(),
+            patientId: Number(patient.value),
+            date: date.value || today(),
+            weight: document.getElementById('weight').value,
+            height: document.getElementById('height').value,
+            pain: document.getElementById('pain').value,
+            mobility: document.getElementById('mobility').value,
+            bodyFat: document.getElementById('bodyFat')?.value || '',
+            muscleMass: document.getElementById('muscleMass')?.value || '',
+            bodyWater: document.getElementById('bodyWater')?.value || '',
+            visceralFat: document.getElementById('visceralFat')?.value || '',
+            basalMetabolism: document.getElementById('basalMetabolism')?.value || '',
+            note: document.getElementById('assessmentNote').value,
+            before: newBefore || (existing && existing.before) || '',
+            after: newAfter || (existing && existing.after) || ''
         };
 
-    Promise.all(
-        [
-            readImage(
-                beforePhoto
-            ),
-            readImage(
-                afterPhoto
-            )
-        ]
-    ).then(
-        (
-            [
-                before,
-                after
-            ]
-        ) => {
-
-            state.assessments.push({
-                id: Date.now(),
-                patientId:
-                    Number(
-                        patient.value
-                    ),
-                date: today(),
-                weight:
-                    weight.value,
-                height:
-                    height.value,
-                pain:
-                    pain.value,
-                mobility:
-                    mobility.value,
-                note:
-                    note.value,
-                before,
-                after
-            });
-
-            saveData();
-
-            const modalElement =
-                document.getElementById(
-                    'assessmentModal'
-                );
-
-            const modal =
-                bootstrap.Modal.getInstance(
-                    modalElement
-                );
-
-            if (modal) {
-                modal.hide();
-            }
-
-            form.reset();
-
-            const beforePreview =
-                document.getElementById(
-                    'beforePreview'
-                );
-
-            const afterPreview =
-                document.getElementById(
-                    'afterPreview'
-                );
-
-            if (beforePreview) {
-                beforePreview.innerHTML = `
-                    <i class="bi bi-image"></i>
-                    <span>Pré-visualização</span>
-                `;
-            }
-
-            if (afterPreview) {
-                afterPreview.innerHTML = `
-                    <i class="bi bi-image"></i>
-                    <span>Pré-visualização</span>
-                `;
-            }
-
-            renderPage();
-
-            toast(
-                'Avaliação registrada e disponível na área do paciente.',
-                'success'
-            );
+        if (existing) {
+            const index = state.assessments.findIndex(item => item.id === existing.id);
+            state.assessments[index] = data;
+        } else {
+            state.assessments.push(data);
         }
-    );
+
+        const wasEditing = Boolean(existing);
+        saveData();
+        bootstrap.Modal.getOrCreateInstance(
+            document.getElementById('assessmentModal')
+        ).hide();
+        resetAssessmentForm();
+        renderPage();
+        toast(
+            wasEditing ? 'Avaliação atualizada com sucesso.' : 'Avaliação registrada e disponível na área do paciente.',
+            'success'
+        );
+    } catch (error) {
+        toast(error.message || 'Não foi possível salvar a avaliação.', 'danger');
+    }
 }
 
 function previewImage(
@@ -3416,6 +3432,18 @@ window.changeAppointmentStatus =
 
 window.addPatient =
     addPatient;
+
+window.openPatientModal =
+    openPatientModal;
+
+window.editPatient =
+    editPatient;
+
+window.savePatient =
+    savePatient;
+
+window.deletePatient =
+    deletePatient;
 
 window.openAssessmentModal =
     openAssessmentModal;
